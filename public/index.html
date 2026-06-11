@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tic-Tac-Toe</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main>
+    <h1>Tic-Tac-Toe</h1>
+
+    <!-- Screen 1: login / lobby entry -->
+    <section id="login-screen">
+      <label for="name">Your name</label>
+      <input id="name" type="text" placeholder="Your name" maxlength="16" />
+      <button id="join">Join game</button>
+      <p class="hint">You'll be matched with the next person who joins.</p>
+    </section>
+
+    <!-- Screen 2: the game (also shows the "waiting in lobby" state) -->
+    <section id="game-screen" class="hidden">
+      <!-- aria-live tells screen readers to announce turn changes and results -->
+      <p id="status" aria-live="polite">Loading…</p>
+      <div id="board"></div>
+      <div id="result"></div>
+    </section>
+  </main>
+
+  <!-- type="module" is REQUIRED for the import statements to work -->
+  <script type="module" src="main.js"></script>
+</body>
+</html>
