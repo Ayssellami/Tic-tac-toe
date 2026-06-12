@@ -44,3 +44,19 @@ input:focus-visible {
 #board.locked .cell { cursor: not-allowed; }
 
 #result button { margin: 0 0.25rem; }
+
+#leaderboard {
+  margin-top: 2.5rem;
+  text-align: center;
+}
+#leaderboard h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 0.75rem; }
+#leaderboard table { border-collapse: collapse; margin: 0 auto; min-width: 260px; }
+#leaderboard th, #leaderboard td {
+  padding: 0.4rem 0.75rem;
+  text-align: center;
+}
+#leaderboard th { color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; border-bottom: 1px solid #334155; }
+#leaderboard td:nth-child(2) { text-align: left; }
+#leaderboard tr:not(:last-child) td { border-bottom: 1px solid #1e293b; }
+#leaderboard tr:hover td { background: #1e293b; }
+.lb-empty { color: #475569; font-size: 0.85rem; padding: 1rem; }

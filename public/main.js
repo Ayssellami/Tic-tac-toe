@@ -1,5 +1,6 @@
 import { signIn, findOrCreateGame } from "./lobby.js";
 import { startGame } from "./game.js";
+import { startLeaderboard } from "./leaderboard.js";
 
 const loginScreen = document.getElementById("login-screen");
 const gameScreen  = document.getElementById("game-screen");
@@ -16,11 +17,11 @@ joinBtn.addEventListener("click", async () => {
   joinBtn.disabled = true;
   joinBtn.textContent = "Joining…";
   try {
-    const uid = await signIn(name);                          // Milestone 2
-    const { gameId, myMark } = await findOrCreateGame(uid, name); // Milestone 3
+    const uid = await signIn(name);
+    const { gameId, myMark } = await findOrCreateGame(uid, name);
     show("game");
-    startGame(gameId, myMark, () => {                        // Milestone 4
-      show("login");                                          // runs when game ends (M7)
+    startGame(gameId, myMark, uid, name, () => {
+      show("login");
       joinBtn.disabled = false;
       joinBtn.textContent = "Join game";
     });
@@ -32,4 +33,4 @@ joinBtn.addEventListener("click", async () => {
 });
 
 show("login");
-
+startLeaderboard();

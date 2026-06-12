@@ -1,7 +1,10 @@
 import { db } from "./firebase-config.js";
-import { doc, onSnapshot, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import {
+  doc, onSnapshot, updateDoc, deleteDoc, getDoc, setDoc, increment,
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
-let gameId = null, myMark = null, latest = null, unsubscribe = null, onEndCb = null;
+let gameId = null, myMark = null, myUid = null, myName = null;
+let latest = null, unsubscribe = null, onEndCb = null, statsWritten = false;
 
 const boardEl  = document.getElementById("board");
 const statusEl = document.getElementById("status");
@@ -12,15 +15,17 @@ const WIN_LINES = [
   [0,4,8],[2,4,6],           // diagonals
 ];
 
-// Called by main.js once we're in a game.
-export function startGame(id, mark, onEnd) {
-  gameId = id; myMark = mark; onEndCb = onEnd || null;
+export function startGame(id, mark, uid, name, onEnd) {
+  gameId = id; myMark = mark; myUid = uid; myName = name;
+  onEndCb = onEnd || null;
+  statsWritten = false;
   buildBoard();
 
-  // THE multiplayer engine: fires on every change to the game doc, for BOTH players.
   unsubscribe = onSnapshot(doc(db, "games", gameId), (snap) => {
-    if (!snap.exists()) return;     // (stretch goal: handle opponent leaving)
+    if (!snap.exists()) return;
     latest = snap.data();
+    // reset statsWritten flag when a rematch resets the board
+    if (latest.status === "active" || latest.status === "waiting") statsWritten = false;
     render();
   });
 }
@@ -30,17 +35,16 @@ function buildBoard() {
   for (let i = 0; i < 9; i++) {
     const cell = document.createElement("button");
     cell.className = "cell";
-    cell.setAttribute("aria-label", `Cell ${i + 1}: empty`);  // screen-reader label
+    cell.setAttribute("aria-label", `Cell ${i + 1}: empty`);
     cell.addEventListener("click", () => handleClick(i));
-    // click handling comes in Milestone 5
     boardEl.appendChild(cell);
   }
 }
 
 function handleClick(i) {
-  if (!latest || latest.status !== "active") return; // not playing
-  if (latest.turn !== myMark) return;                // not your turn
-  if (latest.board[i] !== "") return;                // cell taken
+  if (!latest || latest.status !== "active") return;
+  if (latest.turn !== myMark) return;
+  if (latest.board[i] !== "") return;
 
   const board = [...latest.board];
   board[i] = myMark;
@@ -78,8 +82,29 @@ function render() {
   boardEl.classList.add("locked");
   if (latest.status === "draw") statusEl.textContent = "It's a draw!";
   else statusEl.textContent = latest.winner === myMark ? "You win! 🎉" : "You lose 😖";
-  showEndButtons();   // the buttons themselves come in Milestone 7
-  // game over states are handled in Milestone 6
+
+  if (!statsWritten) {
+    statsWritten = true;
+    writeStats();
+  }
+  showEndButtons();
+}
+
+async function writeStats() {
+  const won  = latest.winner === myMark;
+  const draw = latest.status === "draw";
+  // Always write all three fields so orderBy("wins") never excludes this document.
+  // increment(0) initializes the field to 0 if absent, otherwise leaves it unchanged.
+  try {
+    await setDoc(doc(db, "leaderboard", myUid), {
+      name: myName,
+      wins:   won              ? increment(1) : increment(0),
+      losses: (!won && !draw)  ? increment(1) : increment(0),
+      draws:  draw             ? increment(1) : increment(0),
+    }, { merge: true });
+  } catch (e) {
+    console.warn("Leaderboard write failed:", e);
+  }
 }
 
 function getWinner(board) {
@@ -101,7 +126,6 @@ function showEndButtons() {
   resultEl.append(again, end);
 }
 
-// A rematch happens only when BOTH players have asked for one.
 async function requestRematch() {
   const ref = doc(db, "games", gameId);
   await updateDoc(ref, { [`rematch.${myMark}`]: true });
@@ -120,10 +144,10 @@ async function requestRematch() {
 }
 
 export async function endGame(removeDoc = false) {
-  if (unsubscribe) unsubscribe();                 // stop the live listener (important!)
+  if (unsubscribe) unsubscribe();
   if (removeDoc && gameId) {
     try { await deleteDoc(doc(db, "games", gameId)); } catch (e) {}
   }
-  gameId = null; myMark = null; latest = null;
-  if (onEndCb) onEndCb();                          // main.js sends us back to login
+  gameId = null; myMark = null; myUid = null; myName = null; latest = null;
+  if (onEndCb) onEndCb();
 }
