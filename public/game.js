@@ -6,6 +6,7 @@ import {
 let gameId = null, myMark = null, myUid = null, myName = null;
 let latest = null, unsubscribe = null, onEndCb = null, statsWritten = false;
 let lastReactionId = null;
+let boardSize = 3, winLines = [];
 
 const boardEl       = document.getElementById("board");
 const statusEl      = document.getElementById("status");
@@ -13,14 +14,33 @@ const resultEl      = document.getElementById("result");
 const reactionBarEl = document.getElementById("reaction-bar");
 
 const REACTION_EMOJIS = ["👍", "😂", "🔥", "😮", "😢"];
-const WIN_LINES = [
-  [0,1,2],[3,4,5],[6,7,8],   // rows
-  [0,3,6],[1,4,7],[2,5,8],   // columns
-  [0,4,8],[2,4,6],           // diagonals
-];
+function getWinLines(size) {
+  if (size === 3) return [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6],
+  ];
+  // 5×5: 4-in-a-row (28 lines)
+  const lines = [];
+  for (let r = 0; r < 5; r++)
+    for (let c = 0; c <= 1; c++)
+      lines.push([r*5+c, r*5+c+1, r*5+c+2, r*5+c+3]);
+  for (let c = 0; c < 5; c++)
+    for (let r = 0; r <= 1; r++)
+      lines.push([r*5+c, (r+1)*5+c, (r+2)*5+c, (r+3)*5+c]);
+  for (let r = 0; r <= 1; r++)
+    for (let c = 0; c <= 1; c++)
+      lines.push([r*5+c, (r+1)*5+c+1, (r+2)*5+c+2, (r+3)*5+c+3]);
+  for (let r = 0; r <= 1; r++)
+    for (let c = 3; c <= 4; c++)
+      lines.push([r*5+c, (r+1)*5+c-1, (r+2)*5+c-2, (r+3)*5+c-3]);
+  return lines;
+}
 
-export function startGame(id, mark, uid, name, onEnd) {
+export function startGame(id, mark, uid, name, size, onEnd) {
   gameId = id; myMark = mark; myUid = uid; myName = name;
+  boardSize = size || 3;
+  winLines = getWinLines(boardSize);
   onEndCb = onEnd || null;
   statsWritten = false;
   lastReactionId = null;
@@ -82,7 +102,8 @@ function animateReaction(emoji) {
 
 function buildBoard() {
   boardEl.innerHTML = "";
-  for (let i = 0; i < 9; i++) {
+  boardEl.className = `size-${boardSize}`;
+  for (let i = 0; i < boardSize * boardSize; i++) {
     const cell = document.createElement("button");
     cell.className = "cell";
     cell.setAttribute("aria-label", `Cell ${i + 1}: empty`);
@@ -159,8 +180,9 @@ async function writeStats() {
 }
 
 function getWinner(board) {
-  for (const [a, b, c] of WIN_LINES) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+  for (const line of winLines) {
+    const val = board[line[0]];
+    if (val && line.every(i => board[i] === val)) return val;
   }
   return null;
 }
@@ -185,7 +207,7 @@ async function requestRematch() {
   const r = snap.data().rematch;
   if (r.X && r.O) {
     await updateDoc(ref, {
-      board: ["", "", "", "", "", "", "", "", ""],
+      board: Array(boardSize * boardSize).fill(""),
       turn: "X", status: "active", winner: null,
       rematch: { X: false, O: false },
     });

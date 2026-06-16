@@ -1,6 +1,6 @@
 # Tic-Tac-Toe
 
-A real-time multiplayer Tic-Tac-Toe game built with vanilla JavaScript and Firebase. Two players are matched instantly via anonymous sign-in, play against each other live, send emoji reactions during the game, and compete on a persistent leaderboard.
+A real-time multiplayer Tic-Tac-Toe game built with vanilla JavaScript and Firebase. Two players are matched instantly via anonymous sign-in, choose between a classic 3×3 board or a larger 5×5 board, play against each other live, send emoji reactions during the game, and compete on a persistent leaderboard.
 
 **Live site:** https://tic-tac-toe-2c101.web.app
 
@@ -8,6 +8,7 @@ A real-time multiplayer Tic-Tac-Toe game built with vanilla JavaScript and Fireb
 
 ## Features
 
+- **Two board sizes** — choose 3×3 (classic, 3-in-a-row wins) or 5×5 (4-in-a-row wins) before joining; matchmaking pairs players who selected the same mode
 - **Real-time multiplayer** — two players in separate browsers share a live game board; every move syncs instantly via Firestore
 - **Anonymous matchmaking** — no account needed; enter a name and get matched with the next available player automatically
 - **Emoji reactions** — click any of 5 emoji buttons (👍 😂 🔥 😮 😢) to send a reaction that floats up on screen for both players
@@ -32,8 +33,13 @@ Firebase SDKs are loaded directly from the Google CDN (`firebase/12.14.0`), so t
 
 ## How It Works
 
+### Board size selection
+Before joining, players pick 3×3 or 5×5 via a toggle on the lobby screen. The chosen size is passed through to `findOrCreateGame`, which filters the Firestore waiting-game query by `size`. This means a 3×3 player is only ever matched with another 3×3 player, and likewise for 5×5. The board size is stored in the game document so the joining player automatically gets the correct grid.
+
+Win conditions differ by mode: 3×3 uses the classic 3-in-a-row (8 possible lines), while 5×5 requires 4-in-a-row (28 possible lines computed dynamically).
+
 ### Matchmaking
-When a player joins, `lobby.js` queries Firestore for any game with `status: "waiting"`. If one exists (and isn't theirs), they claim it via a Firestore transaction — preventing race conditions when two players join simultaneously. If no game is available, a new one is created and the player waits as X.
+When a player joins, `lobby.js` queries Firestore for any game with `status: "waiting"` **and matching `size`**. If one exists (and isn't theirs), they claim it via a Firestore transaction — preventing race conditions when two players join simultaneously. If no game is available, a new one is created and the player waits as X.
 
 ### Game sync
 Both players subscribe to the same `games/{gameId}` document with `onSnapshot`. Every move is a `updateDoc` write that instantly triggers the other player's listener. No polling, no WebSockets — Firestore handles it.
@@ -93,7 +99,8 @@ firebase deploy --only hosting
 ### `games/{gameId}`
 ```
 {
-  board:       string[9],          // "" | "X" | "O" for each cell
+  board:       string[9|25],       // "" | "X" | "O" for each cell (9 for 3×3, 25 for 5×5)
+  size:        3 | 5,              // board mode chosen by the host
   players:     { X: uid, O: uid },
   playerNames: { X: name, O: name },
   turn:        "X" | "O",

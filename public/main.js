@@ -6,6 +6,17 @@ const loginScreen = document.getElementById("login-screen");
 const gameScreen  = document.getElementById("game-screen");
 const nameInput   = document.getElementById("name");
 const joinBtn     = document.getElementById("join");
+const sizeBtns    = document.querySelectorAll(".size-btn");
+
+let selectedSize = 3;
+
+sizeBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    sizeBtns.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedSize = Number(btn.dataset.size);
+  });
+});
 
 function show(screen) {
   loginScreen.classList.toggle("hidden", screen !== "login");
@@ -18,9 +29,9 @@ joinBtn.addEventListener("click", async () => {
   joinBtn.textContent = "Joining…";
   try {
     const uid = await signIn(name);
-    const { gameId, myMark } = await findOrCreateGame(uid, name);
+    const { gameId, myMark } = await findOrCreateGame(uid, name, selectedSize);
     show("game");
-    startGame(gameId, myMark, uid, name, () => {
+    startGame(gameId, myMark, uid, name, selectedSize, () => {
       show("login");
       joinBtn.disabled = false;
       joinBtn.textContent = "Join game";
