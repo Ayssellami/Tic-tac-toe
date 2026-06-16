@@ -6,7 +6,7 @@ import {
 const tableBody = document.getElementById("leaderboard-body");
 
 export function startLeaderboard() {
-  const q = query(collection(db, "leaderboard"), orderBy("wins", "desc"), limit(10));
+  const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(10));
 
   return onSnapshot(q, (snap) => {
     tableBody.innerHTML = "";
@@ -15,13 +15,17 @@ export function startLeaderboard() {
       return;
     }
     snap.docs.forEach((d, i) => {
-      const { name, wins = 0, losses = 0, draws = 0 } = d.data();
+      const { name = "?", wins = 0, losses = 0, draws = 0, score = 0 } = d.data();
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${i + 1}</td><td>${name}</td><td>${wins}</td><td>${losses}</td><td>${draws}</td>`;
+      [i + 1, name, wins, losses, draws, score].forEach((val) => {
+        const td = document.createElement("td");
+        td.textContent = val;
+        tr.appendChild(td);
+      });
       tableBody.appendChild(tr);
     });
   }, (err) => {
     console.error("Leaderboard query failed:", err);
-    tableBody.innerHTML = '<tr><td colspan="5" class="lb-empty">Leaderboard unavailable</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="6" class="lb-empty">Leaderboard unavailable</td></tr>';
   });
 }

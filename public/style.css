@@ -60,3 +60,40 @@ input:focus-visible {
 #leaderboard tr:not(:last-child) td { border-bottom: 1px solid #1e293b; }
 #leaderboard tr:hover td { background: #1e293b; }
 .lb-empty { color: #475569; font-size: 0.85rem; padding: 1rem; }
+
+/* ── Emoji reaction bar ────────────────────────────────────────────── */
+#reaction-bar {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  position: relative;  /* anchor for floating emoji children */
+}
+
+.reaction-btn {
+  background: transparent;
+  border: 1px solid #334155;
+  font-size: 1.6rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.reaction-btn:hover { background: #1e293b; }
+
+@keyframes floatUp {
+  0%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-90px); }
+}
+
+.floating-emoji {
+  position: absolute;
+  bottom: 100%;
+  font-size: 1.8rem;
+  pointer-events: none;
+  animation: floatUp 1.4s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-emoji { animation-duration: 0.01s; }
+}

@@ -5,10 +5,14 @@ import {
 
 let gameId = null, myMark = null, myUid = null, myName = null;
 let latest = null, unsubscribe = null, onEndCb = null, statsWritten = false;
+let lastReactionId = null;
 
-const boardEl  = document.getElementById("board");
-const statusEl = document.getElementById("status");
-const resultEl = document.getElementById("result");
+const boardEl       = document.getElementById("board");
+const statusEl      = document.getElementById("status");
+const resultEl      = document.getElementById("result");
+const reactionBarEl = document.getElementById("reaction-bar");
+
+const REACTION_EMOJIS = ["👍", "😂", "🔥", "😮", "😢"];
 const WIN_LINES = [
   [0,1,2],[3,4,5],[6,7,8],   // rows
   [0,3,6],[1,4,7],[2,5,8],   // columns
@@ -19,15 +23,61 @@ export function startGame(id, mark, uid, name, onEnd) {
   gameId = id; myMark = mark; myUid = uid; myName = name;
   onEndCb = onEnd || null;
   statsWritten = false;
+  lastReactionId = null;
   buildBoard();
+  buildReactionBar();
 
   unsubscribe = onSnapshot(doc(db, "games", gameId), (snap) => {
     if (!snap.exists()) return;
     latest = snap.data();
     // reset statsWritten flag when a rematch resets the board
     if (latest.status === "active" || latest.status === "waiting") statsWritten = false;
+    handleReaction(latest.reaction);
     render();
   });
+}
+
+function buildReactionBar() {
+  reactionBarEl.innerHTML = "";
+  for (const emoji of REACTION_EMOJIS) {
+    const btn = document.createElement("button");
+    btn.className = "reaction-btn";
+    btn.textContent = emoji;
+    btn.setAttribute("aria-label", `React with ${emoji}`);
+    btn.addEventListener("click", () => sendReaction(emoji));
+    reactionBarEl.appendChild(btn);
+  }
+}
+
+function sendReaction(emoji) {
+  if (!gameId) return;
+  updateDoc(doc(db, "games", gameId), {
+    reaction: { emoji, by: myUid, id: `${Date.now()}-${Math.random()}` },
+  });
+}
+
+function handleReaction(r) {
+  if (!r) return;
+  // On first snapshot of a session, baseline without animating so we don't
+  // replay a reaction left over from before this player joined.
+  if (lastReactionId === null) {
+    lastReactionId = r.id;
+    return;
+  }
+  if (r.id === lastReactionId) return;
+  lastReactionId = r.id;
+  animateReaction(r.emoji);
+}
+
+function animateReaction(emoji) {
+  const span = document.createElement("span");
+  span.className = "floating-emoji";
+  span.textContent = emoji;
+  // Random horizontal spread across the bar width
+  const jitter = Math.floor(Math.random() * 200) - 100;
+  span.style.left = `calc(50% + ${jitter}px)`;
+  reactionBarEl.appendChild(span);
+  span.addEventListener("animationend", () => span.remove(), { once: true });
 }
 
 function buildBoard() {
@@ -101,6 +151,7 @@ async function writeStats() {
       wins:   won              ? increment(1) : increment(0),
       losses: (!won && !draw)  ? increment(1) : increment(0),
       draws:  draw             ? increment(1) : increment(0),
+      score: won ? increment(3) : draw ? increment(1) : increment(0),
     }, { merge: true });
   } catch (e) {
     console.warn("Leaderboard write failed:", e);
