@@ -2,13 +2,15 @@ import { signIn, findOrCreateGame } from "./lobby.js";
 import { startGame } from "./game.js";
 import { startLeaderboard } from "./leaderboard.js";
 
-const loginScreen = document.getElementById("login-screen");
-const gameScreen  = document.getElementById("game-screen");
-const nameInput   = document.getElementById("name");
-const joinBtn     = document.getElementById("join");
-const sizeBtns    = document.querySelectorAll(".size-btn");
+const loginScreen    = document.getElementById("login-screen");
+const gameScreen     = document.getElementById("game-screen");
+const nameInput      = document.getElementById("name");
+const joinBtn        = document.getElementById("join");
+const sizeBtns       = document.querySelectorAll(".size-btn");
+const minigameToggle = document.getElementById("minigame-toggle");
 
 let selectedSize = 3;
+let minigameMode = false;
 
 sizeBtns.forEach(btn => {
   btn.addEventListener("click", () => {
@@ -16,6 +18,12 @@ sizeBtns.forEach(btn => {
     btn.classList.add("active");
     selectedSize = Number(btn.dataset.size);
   });
+});
+
+minigameToggle.addEventListener("click", () => {
+  minigameMode = !minigameMode;
+  minigameToggle.classList.toggle("active", minigameMode);
+  minigameToggle.textContent = minigameMode ? "Minigames: On" : "Minigames: Off";
 });
 
 function show(screen) {
@@ -29,7 +37,7 @@ joinBtn.addEventListener("click", async () => {
   joinBtn.textContent = "Joining…";
   try {
     const uid = await signIn(name);
-    const { gameId, myMark } = await findOrCreateGame(uid, name, selectedSize);
+    const { gameId, myMark } = await findOrCreateGame(uid, name, selectedSize, minigameMode);
     show("game");
     startGame(gameId, myMark, uid, name, selectedSize, () => {
       show("login");

@@ -1,6 +1,6 @@
 # Tic-Tac-Toe
 
-A real-time multiplayer Tic-Tac-Toe game built with vanilla JavaScript and Firebase. Two players are matched instantly via anonymous sign-in, choose between a classic 3×3 board or a larger 5×5 board, play against each other live, send emoji reactions during the game, and compete on a persistent leaderboard.
+A real-time multiplayer Tic-Tac-Toe game built with vanilla JavaScript and Firebase. Two players are matched instantly via anonymous sign-in, choose between a classic 3×3 board or a larger 5×5 board, optionally turn on Minigame Mode to fight for every cell in a nested tic-tac-toe match, send emoji reactions during the game, and compete on a persistent leaderboard.
 
 **Live site:** https://tic-tac-toe-2c101.web.app
 
@@ -9,6 +9,7 @@ A real-time multiplayer Tic-Tac-Toe game built with vanilla JavaScript and Fireb
 ## Features
 
 - **Two board sizes** — choose 3×3 (classic, 3-in-a-row wins) or 5×5 (4-in-a-row wins) before joining; matchmaking pairs players who selected the same mode
+- **Minigame Mode** — an optional toggle that turns every move into a fight: clicking a cell opens a 3×3 mini tic-tac-toe match; win it to claim the cell, lose it and your opponent claims it, draw and the cell stays empty
 - **Real-time multiplayer** — two players in separate browsers share a live game board; every move syncs instantly via Firestore
 - **Anonymous matchmaking** — no account needed; enter a name and get matched with the next available player automatically
 - **Emoji reactions** — click any of 5 emoji buttons (👍 😂 🔥 😮 😢) to send a reaction that floats up on screen for both players
@@ -38,8 +39,17 @@ Before joining, players pick 3×3 or 5×5 via a toggle on the lobby screen. The 
 
 Win conditions differ by mode: 3×3 uses the classic 3-in-a-row (8 possible lines), while 5×5 requires 4-in-a-row (28 possible lines computed dynamically).
 
+### Minigame Mode
+When enabled, clicking an empty cell writes a `minigame` object to the game document instead of placing a mark. Both players are shown a 3×3 overlay board and play a full nested tic-tac-toe match to decide who claims the cell:
+
+- **Challenger wins the minigame** → their mark goes in the contested cell
+- **Challenger loses** → their opponent's mark goes in the cell
+- **Draw** → the cell stays empty
+
+The challenger (whoever clicked) always moves first in the minigame. Regardless of the minigame result, the main-board turn passes to the other player — the move is always spent. Both the minigame board and turn are stored in the same `games/{gameId}` document and sync to both players in real time via the existing `onSnapshot` listener; no additional Firestore subscriptions are needed.
+
 ### Matchmaking
-When a player joins, `lobby.js` queries Firestore for any game with `status: "waiting"` **and matching `size`**. If one exists (and isn't theirs), they claim it via a Firestore transaction — preventing race conditions when two players join simultaneously. If no game is available, a new one is created and the player waits as X.
+When a player joins, `lobby.js` queries Firestore for any game with `status: "waiting"` **and matching `size` and `minigames`**. If one exists (and isn't theirs), they claim it via a Firestore transaction — preventing race conditions when two players join simultaneously. If no game is available, a new one is created and the player waits as X. The triple equality filter requires a Firestore composite index on `(status, size, minigames)`.
 
 ### Game sync
 Both players subscribe to the same `games/{gameId}` document with `onSnapshot`. Every move is a `updateDoc` write that instantly triggers the other player's listener. No polling, no WebSockets — Firestore handles it.
@@ -101,6 +111,13 @@ firebase deploy --only hosting
 {
   board:       string[9|25],       // "" | "X" | "O" for each cell (9 for 3×3, 25 for 5×5)
   size:        3 | 5,              // board mode chosen by the host
+  minigames:   boolean,            // whether Minigame Mode is active for this game
+  minigame:    {                   // active cell contest, or null when none in progress
+    cell:       number,            //   index of the contested main-board cell
+    challenger: "X" | "O",        //   player who triggered the contest
+    board:      string[9],         //   the 3×3 mini board ("" | "X" | "O")
+    turn:       "X" | "O"         //   whose mini turn it is
+  } | null,
   players:     { X: uid, O: uid },
   playerNames: { X: name, O: name },
   turn:        "X" | "O",

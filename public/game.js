@@ -8,12 +8,16 @@ let latest = null, unsubscribe = null, onEndCb = null, statsWritten = false;
 let lastReactionId = null;
 let boardSize = 3, winLines = [];
 
-const boardEl       = document.getElementById("board");
-const statusEl      = document.getElementById("status");
-const resultEl      = document.getElementById("result");
-const reactionBarEl = document.getElementById("reaction-bar");
+const boardEl        = document.getElementById("board");
+const statusEl       = document.getElementById("status");
+const resultEl       = document.getElementById("result");
+const reactionBarEl  = document.getElementById("reaction-bar");
+const overlayEl      = document.getElementById("minigame-overlay");
+const miniBoardEl    = document.getElementById("mini-board");
+const miniStatusEl   = document.getElementById("mini-status");
 
 const REACTION_EMOJIS = ["👍", "😂", "🔥", "😮", "😢"];
+const miniWinLines = getWinLines(3);
 function getWinLines(size) {
   if (size === 3) return [
     [0,1,2],[3,4,5],[6,7,8],
@@ -45,6 +49,7 @@ export function startGame(id, mark, uid, name, size, onEnd) {
   statsWritten = false;
   lastReactionId = null;
   buildBoard();
+  buildMiniBoard();
   buildReactionBar();
 
   unsubscribe = onSnapshot(doc(db, "games", gameId), (snap) => {
@@ -112,10 +117,30 @@ function buildBoard() {
   }
 }
 
+function buildMiniBoard() {
+  miniBoardEl.innerHTML = "";
+  for (let j = 0; j < 9; j++) {
+    const cell = document.createElement("button");
+    cell.className = "mini-cell";
+    cell.setAttribute("aria-label", `Mini cell ${j + 1}: empty`);
+    cell.addEventListener("click", () => handleMiniClick(j));
+    miniBoardEl.appendChild(cell);
+  }
+}
+
 function handleClick(i) {
   if (!latest || latest.status !== "active") return;
   if (latest.turn !== myMark) return;
   if (latest.board[i] !== "") return;
+
+  // Minigame mode: contest the cell instead of placing directly
+  if (latest.minigames) {
+    if (latest.minigame) return; // a contest is already in progress
+    updateDoc(doc(db, "games", gameId), {
+      minigame: { cell: i, challenger: myMark, board: Array(9).fill(""), turn: myMark },
+    });
+    return;
+  }
 
   const board = [...latest.board];
   board[i] = myMark;
@@ -130,6 +155,48 @@ function handleClick(i) {
   updateDoc(doc(db, "games", gameId), update);
 }
 
+function handleMiniClick(j) {
+  if (!latest || !latest.minigame) return;
+  const mg = latest.minigame;
+  if (mg.turn !== myMark) return;
+  if (mg.board[j] !== "") return;
+
+  const miniBoard = [...mg.board];
+  miniBoard[j] = myMark;
+
+  const miniWinner = getWinner(miniBoard, miniWinLines);
+  const miniFull   = miniBoard.every((c) => c !== "");
+
+  if (!miniWinner && !miniFull) {
+    // Contest continues — pass mini turn
+    const other = myMark === "X" ? "O" : "X";
+    updateDoc(doc(db, "games", gameId), {
+      "minigame.board": miniBoard,
+      "minigame.turn": other,
+    });
+    return;
+  }
+
+  // Contest resolved — write result to main board and clear minigame
+  const mainBoard = [...latest.board];
+  if (miniWinner) {
+    // winner of minigame gets the cell (challenger wins → challenger's mark; opponent wins → opponent's mark)
+    mainBoard[mg.cell] = miniWinner;
+  }
+  // draw: mainBoard[mg.cell] stays ""
+
+  const mainWinner = getWinner(mainBoard);
+  const mainFull   = mainBoard.every((c) => c !== "");
+  const update = { board: mainBoard, minigame: null };
+  // Challenger's turn is always spent; next turn is the other player
+  const nextTurn = mg.challenger === "X" ? "O" : "X";
+  if (mainWinner)    { update.status = "won";  update.winner = mainWinner; }
+  else if (mainFull) { update.status = "draw"; }
+  else               { update.turn = nextTurn; }
+
+  updateDoc(doc(db, "games", gameId), update);
+}
+
 function render() {
   const cells = boardEl.querySelectorAll(".cell");
   latest.board.forEach((value, i) => {
@@ -137,6 +204,24 @@ function render() {
     cells[i].setAttribute("aria-label", `Cell ${i + 1}: ${value || "empty"}`);
   });
   resultEl.innerHTML = "";
+
+  // Minigame overlay
+  if (latest.minigame) {
+    const mg = latest.minigame;
+    overlayEl.classList.remove("hidden");
+    const miniCells = miniBoardEl.querySelectorAll(".mini-cell");
+    mg.board.forEach((value, j) => {
+      miniCells[j].textContent = value;
+      miniCells[j].setAttribute("aria-label", `Mini cell ${j + 1}: ${value || "empty"}`);
+    });
+    const myMiniTurn = mg.turn === myMark;
+    miniStatusEl.textContent = myMiniTurn
+      ? `Fighting for cell ${mg.cell + 1} — Your move`
+      : `Fighting for cell ${mg.cell + 1} — Opponent's move`;
+    miniBoardEl.classList.toggle("locked", !myMiniTurn);
+  } else {
+    overlayEl.classList.add("hidden");
+  }
 
   if (latest.status === "waiting") {
     statusEl.textContent = `Waiting in the lobby for an opponent… (you are ${myMark})`;
@@ -146,7 +231,8 @@ function render() {
   if (latest.status === "active") {
     const myTurn = latest.turn === myMark;
     statusEl.textContent = myTurn ? "Your move" : "Opponent's move";
-    boardEl.classList.toggle("locked", !myTurn);
+    // Lock main board during a minigame contest too
+    boardEl.classList.toggle("locked", !myTurn || !!latest.minigame);
     return;
   }
   // game over
@@ -179,8 +265,8 @@ async function writeStats() {
   }
 }
 
-function getWinner(board) {
-  for (const line of winLines) {
+function getWinner(board, lines = winLines) {
+  for (const line of lines) {
     const val = board[line[0]];
     if (val && line.every(i => board[i] === val)) return val;
   }
@@ -210,6 +296,7 @@ async function requestRematch() {
       board: Array(boardSize * boardSize).fill(""),
       turn: "X", status: "active", winner: null,
       rematch: { X: false, O: false },
+      minigame: null,
     });
   } else {
     statusEl.textContent = "Waiting for opponent to accept a rematch…";

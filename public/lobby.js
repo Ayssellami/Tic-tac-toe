@@ -14,10 +14,10 @@ export async function signIn(name) {
 }  
   
 // Find an open game to join, or host a new one if there isn't one.
-export async function findOrCreateGame(uid, name, size = 3) {
-    // 1) Look for games waiting for a second player with the same board size.
+export async function findOrCreateGame(uid, name, size = 3, minigames = false) {
+    // 1) Look for games waiting for a second player with the same board size and mode.
     const snapshot = await getDocs(
-      query(collection(db, "games"), where("status", "==", "waiting"), where("size", "==", size), limit(5))
+      query(collection(db, "games"), where("status", "==", "waiting"), where("size", "==", size), where("minigames", "==", minigames), limit(5))
     );
     // Don't join a game we're hosting ourselves.
     const candidate = snapshot.docs.find((d) => d.data().players.X !== uid);
@@ -48,6 +48,8 @@ export async function findOrCreateGame(uid, name, size = 3) {
     const newGame = await addDoc(collection(db, "games"), {
       board: Array(size * size).fill(""),
       size,
+      minigames,
+      minigame: null,
       players: { X: uid, O: null },
       playerNames: { X: name, O: null },
       turn: "X",

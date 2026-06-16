@@ -17,6 +17,7 @@
       <div id="size-selector">
         <button class="size-btn active" data-size="3">3×3</button>
         <button class="size-btn" data-size="5">5×5</button>
+        <button id="minigame-toggle" class="toggle-btn">Minigames: Off</button>
       </div>
       <button id="join">Join game</button>
       <p class="hint">You'll be matched with the next person who joins.</p>
@@ -28,6 +29,13 @@
       <p id="status" aria-live="polite">Loading…</p>
       <div id="board"></div>
       <div id="result"></div>
+      <!-- Minigame overlay: shown when a cell is contested in minigame mode -->
+      <div id="minigame-overlay" class="hidden">
+        <div id="minigame-modal">
+          <p id="mini-status" aria-live="polite"></p>
+          <div id="mini-board"></div>
+        </div>
+      </div>
       <!-- Emoji reactions: buttons built in game.js; reactions broadcast to both players -->
       <div id="reaction-bar"></div>
     </section>
